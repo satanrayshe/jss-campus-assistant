@@ -154,6 +154,7 @@ export async function streamAnswer(
 
 /** Asks server.js whether it holds a key. Resolves null on static hosting. */
 export async function probeServer(): Promise<{ ai: boolean; model: string } | null> {
+  if (location.hostname.endsWith("github.io")) return null // static hosting: no server to ask
   try {
     const r = await fetch("api/health")
     if (!r.ok || !r.headers.get("content-type")?.includes("json")) return null
