@@ -34,34 +34,47 @@ async function proxyChat(req, res) {
   res.end();
 }
 
-http
-  .createServer(async (req, res) => {
-    const url = new URL(req.url, "http://localhost");
-    try {
-      if (url.pathname === "/api/health") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ ai: Boolean(KEY), model: MODEL }));
-      }
-      if (url.pathname === "/api/chat" && req.method === "POST") {
-        if (!KEY) {
-          res.writeHead(503, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ error: { message: "OPENROUTER_API_KEY missing in .env" } }));
-        }
-        return await proxyChat(req, res);
-      }
-      const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-      if (!PUBLIC.has(file)) {
-        res.writeHead(404);
-        return res.end("Not found");
-      }
-      res.writeHead(200, { "Content-Type": `${TYPES[path.extname(file)]}; charset=utf-8` });
-      fs.createReadStream(path.join(__dirname, file)).pipe(res);
-    } catch (err) {
-      console.error(err);
-      if (!res.headersSent) res.writeHead(502, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: { message: String(err.message || err) } }));
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, "http://localhost");
+  try {
+    if (url.pathname === "/api/health") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ai: Boolean(KEY), model: MODEL }));
     }
-  })
-  .listen(PORT, () => {
-    console.log(`Axon running at http://localhost:${PORT}  (${KEY ? `AI: ${MODEL}` : "offline mode: no key in .env"})`);
+    if (url.pathname === "/api/chat" && req.method === "POST") {
+      if (!KEY) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: { message: "OPENROUTER_API_KEY missing in .env" } }));
+      }
+      return await proxyChat(req, res);
+    }
+    const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
+    if (!PUBLIC.has(file)) {
+      res.writeHead(404);
+      return res.end("Not found");
+    }
+    res.writeHead(200, { "Content-Type": `${TYPES[path.extname(file)]}; charset=utf-8` });
+    fs.createReadStream(path.join(__dirname, file)).pipe(res);
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) res.writeHead(502, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message: String(err.message || err) } }));
+  }
+});
+
+// If the port is taken (e.g. another copy is already running), try the next one.
+function listen(port) {
+  server.once("error", (err) => {
+    if (err.code === "EADDRINUSE" && port < PORT + 10) {
+      console.log(`Port ${port} is busy, trying ${port + 1}...`);
+      return listen(port + 1);
+    }
+    throw err;
   });
+  server.listen(port);
+}
+server.once("listening", () => {
+  const { port } = server.address();
+  console.log(`Axon running at http://localhost:${port}  (${KEY ? `AI: ${MODEL}` : "offline mode: no key in .env"})`);
+});
+listen(PORT);
