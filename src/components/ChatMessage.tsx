@@ -7,6 +7,7 @@ import IconOfficial from "~icons/solar/document-text-linear"
 import IconGuidance from "~icons/solar/lightbulb-linear"
 import IconWarn from "~icons/solar/danger-triangle-linear"
 import IconRadar from "~icons/solar/radar-2-linear"
+import IconCalendar from "~icons/solar/calendar-linear"
 import { AxonMark } from "@/components/AxonMark"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -25,7 +26,9 @@ export type Msg =
       text: string
       status: "thinking" | "streaming" | "done"
       sources: string[]
-      mode?: "ai" | "offline" | "nomatch"
+      mode?: "ai" | "offline" | "nomatch" | "tracker"
+      /** Answer came from the student's own semester data. */
+      personal?: boolean
       model?: string
       note?: string
       /** Set when the guidelines couldn't answer part of the question; it was logged as a knowledge gap. */
@@ -50,9 +53,10 @@ interface AssistantProps {
   speaking: boolean
   onSpeak: () => void
   onAsk: (q: string) => void
+  onOpenSemester: () => void
 }
 
-export function AssistantMessage({ msg, speaking, onSpeak, onAsk }: AssistantProps) {
+export function AssistantMessage({ msg, speaking, onSpeak, onAsk, onOpenSemester }: AssistantProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   useReveal(ref)
@@ -71,7 +75,9 @@ export function AssistantMessage({ msg, speaking, onSpeak, onAsk }: AssistantPro
         ? "offline · matched from the FAQ"
         : msg.mode === "nomatch"
           ? "offline · no match"
-          : ""
+          : msg.mode === "tracker"
+            ? "from your semester tracker"
+            : ""
 
   return (
     <div ref={ref} className="flex gap-3.5">
@@ -114,8 +120,20 @@ export function AssistantMessage({ msg, speaking, onSpeak, onAsk }: AssistantPro
                 </span>
               </p>
             )}
-            {msg.sources.length > 0 && (
+            {(msg.sources.length > 0 || msg.personal) && (
               <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Sources">
+                {msg.personal && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={onOpenSemester}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/[0.06] px-2 py-1 text-xs text-foreground transition-colors outline-none hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      <IconCalendar className="size-3.5 shrink-0" />
+                      Your semester tracker
+                    </button>
+                  </li>
+                )}
                 {msg.sources.map((id) => {
                   const f = byId[id]
                   const Icon = f.official ? IconOfficial : IconGuidance

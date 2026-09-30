@@ -2,14 +2,26 @@ import gsap from "gsap"
 import { useLayoutEffect, useRef } from "react"
 import IconArrow from "~icons/solar/arrow-right-up-linear"
 import IconChecklist from "~icons/solar/checklist-minimalistic-linear"
+import IconClock from "~icons/solar/clock-circle-linear"
 import { Button } from "@/components/ui/button"
+import { fmtTime, nextClass, pct, shortVerdict, whenLabel, type Course } from "@/lib/semester"
 import { byId, catById } from "@/data/faq"
 import { CATEGORY_ICON } from "@/components/Topics"
 
 const STARTERS = ["attendance", "hostel-curfew", "library-timings", "clubs", "fest", "anti-ragging"]
 const HEADLINE = "Namaste, fresher."
 
-export function Welcome({ onAsk, onPlan }: { onAsk: (q: string) => void; onPlan: () => void }) {
+interface Props {
+  onAsk: (q: string) => void
+  onPlan: () => void
+  courses: Course[]
+  onOpenSemester: () => void
+}
+
+const PERSONAL = ["What's my next class?", "Can I bunk any class tomorrow?"]
+
+export function Welcome({ onAsk, onPlan, courses, onOpenSemester }: Props) {
+  const next = nextClass(courses)
   const root = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -44,15 +56,54 @@ export function Welcome({ onAsk, onPlan }: { onAsk: (q: string) => void; onPlan:
         I'm Axon. Ask me anything about your first weeks at JSS University Noida. Every answer comes from the university's own
         guidelines, and I'll show you where.
       </p>
-      <div data-sub className="mt-6">
+      <div data-sub className="mt-6 flex flex-wrap gap-2">
         <Button variant="outline" size="lg" onClick={onPlan} className="h-10 rounded-full pr-4 pl-3.5 text-[14px]">
           <IconChecklist className="size-[18px] text-saffron-ink" />
           Build my first-week plan
         </Button>
+        {!courses.length && (
+          <Button variant="outline" size="lg" onClick={onOpenSemester} className="h-10 rounded-full pr-4 pl-3.5 text-[14px]">
+            <IconClock className="size-[18px] text-saffron-ink" />
+            Set up my timetable
+          </Button>
+        )}
       </div>
 
-      <ul className="mt-10 border-t border-border" aria-label="Common first-week questions">
-        {STARTERS.map((id) => {
+      {next && (
+        <button
+          type="button"
+          data-sub
+          onClick={onOpenSemester}
+          className="group mt-8 flex w-full items-center gap-4 rounded-2xl bg-primary px-5 py-4 text-left text-primary-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <IconClock className="size-5 shrink-0 text-saffron" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-primary-foreground/70">
+              Next class · {whenLabel(next)} · {fmtTime(next.slot.start)}
+              {next.slot.room ? ` · ${next.slot.room}` : ""}
+            </span>
+            <span className="block truncate font-medium">{next.course.name}</span>
+          </span>
+          <span className="hidden text-right text-xs text-primary-foreground/80 sm:block">
+            <span className="font-mono text-base text-primary-foreground">{pct(next.course).toFixed(0)}%</span>
+            <span className="block">{shortVerdict(next.course)}</span>
+          </span>
+        </button>
+      )}
+
+      <ul className={next ? "mt-6 border-t border-border" : "mt-10 border-t border-border"} aria-label="Common first-week questions">
+        {courses.length > 0 &&
+          PERSONAL.map((q) => (
+            <li key={q} data-row className="border-b border-border">
+              <button type="button" onClick={() => onAsk(q)} className="group flex w-full items-center gap-4 px-1 py-3.5 text-left outline-none focus-visible:bg-accent/60">
+                <IconClock className="size-[18px] shrink-0 text-muted-foreground transition-colors group-hover:text-saffron-ink" />
+                <span className="flex-1 text-[15px] font-medium transition-transform duration-300 group-hover:translate-x-0.5">{q}</span>
+                <span className="hidden font-mono text-[11px] tracking-wide text-muted-foreground uppercase sm:block">My semester</span>
+                <IconArrow className="size-4 shrink-0 text-muted-foreground transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+              </button>
+            </li>
+          ))}
+        {STARTERS.slice(0, courses.length ? 4 : 6).map((id) => {
           const f = byId[id]
           const Icon = CATEGORY_ICON[f.category]
           return (

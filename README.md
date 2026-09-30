@@ -6,9 +6,16 @@ An AI assistant for new students at **JSS University Noida**. It answers first-w
 
 ## What makes it different
 
-**1. Knowledge-gap radar.** Most campus bots either guess or give up quietly when they don't know something. Axon tells the student the guidelines don't cover it, then **logs the gap**. The **Gaps** panel groups these by topic and counts them ("college bus from the metro, asked 14×"). One click exports a CSV, or copies an email draft for the admin office. So every unanswered question becomes a to-do item for whoever maintains the guidelines.
+**1. It knows your semester, not just the rulebook.** Paste the timetable your class rep shared, as messy WhatsApp text or a copied table. Axon's AI turns it into your courses and weekly class times. From then on:
+- **My semester** shows your next class with a countdown and room, today's classes with one-tap present/absent, and a card per course.
+- Each card applies the **official 75% rule** to your own numbers: *"Safe, you can skip 2 more"* or *"Below 75%, attend the next 4 to get back"*.
+- The chat answers from your data. "Can I bunk physics tomorrow?", "what's my next class?" and "kal kitni classes hain?" get answers built on your real numbers, in the language you asked in.
+- Log attendance by typing. "attended PPS, skipped maths" or "aaj maths chhodi aur physics attend kiya" updates the tracker instantly, even offline.
+- **Hands-free mode** reads every answer aloud. Tap the mic, speak (it waits through pauses), tap again, and listen to the reply.
 
-**2. My first-week plan.** Three taps (hostel or day scholar, programme, interests) build a personal checklist from the knowledge base:
+**2. Knowledge-gap radar.** Most campus bots either guess or give up quietly when they don't know something. Axon tells the student the guidelines don't cover it, then **logs the gap**. The **Gaps** panel groups these by topic and counts them ("college bus from the metro, asked 14×"). One click exports a CSV, or copies an email draft for the admin office. So every unanswered question becomes a to-do item for whoever maintains the guidelines.
+
+**3. My first-week plan.** Three taps (hostel or day scholar, programme, interests) build a personal checklist from the knowledge base:
 - your exact curfew
 - the 75% attendance rule
 - the anti-ragging helpline
@@ -16,7 +23,7 @@ An AI assistant for new students at **JSS University Noida**. It answers first-w
 
 Every item cites its source. You can tick items off (progress is saved) and print the plan.
 
-**3. Grounded answers with sources.** Each answer shows the entries it drew on. 📄 marks an official fact, 💡 marks general guidance worth confirming. The model is instructed not to add tips or details that aren't in the knowledge base.
+**4. Grounded answers with sources.** Each answer shows the entries it drew on. 📄 marks an official fact, 💡 marks general guidance worth confirming. The model is instructed not to add tips or details that aren't in the knowledge base.
 
 ## Features
 

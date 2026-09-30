@@ -13,9 +13,11 @@ export interface AiConfig {
   viaServer: boolean
   key: string
   model: string
+  /** The student's own timetable and attendance (from My semester), already computed. */
+  personal?: string
 }
 
-function systemPrompt() {
+function systemPrompt(personal = "") {
   const kb = CAMPUS.faqs
     .map(
       (f) =>
@@ -38,7 +40,16 @@ Rules:
   MISSING: <in under 10 words, the campus detail the student asked for that the knowledge base doesn't cover>. Include this line only when part of a campus question went unanswered.
 
 === CAMPUS KNOWLEDGE BASE ===
-${kb}`
+${kb}${
+    personal
+      ? `
+
+=== THIS STUDENT'S OWN SEMESTER (private, from their tracker) ===
+${personal}
+
+For questions about the student's own classes, timetable, attendance or bunking, answer from this block and cite it as "my-semester" in SOURCES. Its numbers are already calculated: repeat them exactly, never recalculate. Remind them the rule is 75% per course when it matters.`
+      : ""
+  }`
 }
 
 // The model ends with SOURCES:/MISSING: lines. Everything from the first of them on is metadata.
@@ -54,6 +65,8 @@ export interface Answer {
   /** Campus detail the knowledge base couldn't answer: a knowledge gap. */
   missing?: string
   offTopic: boolean
+  /** The answer drew on the student's own semester data. */
+  personal: boolean
 }
 
 export async function streamAnswer(
@@ -80,7 +93,7 @@ export async function streamAnswer(
       temperature: 0.3,
       max_tokens: 1500,
       reasoning: { effort: "low", exclude: true }, // free reasoning models otherwise burn the token budget thinking
-      messages: [{ role: "system", content: systemPrompt() }, ...history.slice(-8)],
+      messages: [{ role: "system", content: systemPrompt(cfg.personal) }, ...history.slice(-8)],
     }),
   })
   if (!res.ok || !res.body) {
@@ -149,7 +162,35 @@ export async function streamAnswer(
     model,
     missing: !offTopic && missing && !/^none$/i.test(missing) ? missing.slice(0, 120) : undefined,
     offTopic,
+    personal: /my-semester/i.test(srcLine),
   }
+}
+
+/** One non-streaming call that must return JSON. Used for timetable import. */
+export async function completeJson<T>(cfg: AiConfig, system: string, user: string): Promise<T> {
+  const models = [cfg.model, ...FALLBACK_MODELS.filter((m) => m !== cfg.model)].slice(0, 3)
+  const res = await fetch(cfg.viaServer ? "api/chat" : "https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: cfg.viaServer
+      ? { "Content-Type": "application/json" }
+      : { Authorization: `Bearer ${cfg.key}`, "Content-Type": "application/json", "HTTP-Referer": location.origin, "X-Title": "Axon Campus Assistant" },
+    body: JSON.stringify({
+      models,
+      temperature: 0,
+      max_tokens: 3000,
+      reasoning: { effort: "low", exclude: true },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  })
+  const j = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(j.error?.message || `OpenRouter ${res.status}`)
+  const text: string = j.choices?.[0]?.message?.content ?? ""
+  const block = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)
+  if (!block) throw new Error("the model didn't return a timetable")
+  return JSON.parse(block) as T
 }
 
 /** Asks server.js whether it holds a key. Resolves null on static hosting. */

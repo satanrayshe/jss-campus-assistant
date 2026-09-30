@@ -3,13 +3,22 @@ import { toast } from "sonner"
 import IconMic from "~icons/solar/microphone-3-linear"
 import IconMicLive from "~icons/solar/microphone-3-bold"
 import IconSend from "~icons/solar/plain-bold"
+import IconSpeakOn from "~icons/solar/volume-loud-bold"
+import IconSpeakOff from "~icons/solar/volume-cross-linear"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useDictation } from "@/hooks/useSpeech"
 import { cn } from "@/lib/utils"
 
-export function Composer({ onSend, busy }: { onSend: (q: string) => void; busy: boolean }) {
+interface Props {
+  onSend: (q: string) => void
+  busy: boolean
+  autoSpeak: boolean
+  onToggleAutoSpeak: () => void
+}
+
+export function Composer({ onSend, busy, autoSpeak, onToggleAutoSpeak }: Props) {
   const [text, setText] = useState("")
   const area = useRef<HTMLTextAreaElement>(null)
   const dictation = useDictation(setText)
@@ -99,9 +108,26 @@ export function Composer({ onSend, busy }: { onSend: (q: string) => void; busy: 
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
             readOnly={dictation.listening}
-            placeholder={dictation.listening ? "Speak now…" : "Ask a campus question…"}
+            placeholder={dictation.listening ? "Speak now…" : "Ask, or log “skipped maths”"}
             className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-snug outline-none placeholder:text-muted-foreground/80"
           />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                onClick={onToggleAutoSpeak}
+                aria-pressed={autoSpeak}
+                aria-label={autoSpeak ? "Stop reading answers aloud" : "Read answers aloud automatically"}
+                className={cn("rounded-xl text-muted-foreground [&_svg:not([class*='size-'])]:size-5", autoSpeak && "text-saffron-ink")}
+              >
+                {autoSpeak ? <IconSpeakOn /> : <IconSpeakOff />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{autoSpeak ? "Hands-free: answers are read aloud" : "Read answers aloud automatically"}</TooltipContent>
+          </Tooltip>
 
           <Button type="submit" size="icon-lg" disabled={busy || !text.trim()} aria-label="Send" className="rounded-xl [&_svg:not([class*='size-'])]:size-[18px]">
             <IconSend />
