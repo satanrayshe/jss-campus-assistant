@@ -16,19 +16,16 @@ An AI FAQ assistant that helps new students at **JSS University Noida** with que
 
 ## Run it
 
-It's a static site with no build step:
+**Recommended: local server with `.env`.** The key stays on the server and never reaches the browser.
 
 ```bash
-npx serve .        # or: python -m http.server 8000
+cp .env.example .env     # then paste your OpenRouter key into .env
+npm start                # http://localhost:3000
 ```
 
-Open the page, click **⚙️ AI settings** and paste an OpenRouter key. The key is stored only in your browser's localStorage. The default model is `~google/gemini-flash-latest`, with automatic fallback to other models.
+`server.js` has no dependencies (Node 20.12+). It reads `.env`, serves the app and proxies `/api/chat` to OpenRouter. It uses **free OpenRouter models** only: `google/gemma-4-31b-it:free`, then `nvidia/nemotron-3-super-120b-a12b:free`, then `openrouter/free`. OpenRouter moves to the next model automatically when one is rate-limited. Free models have daily request caps, so add a few dollars of OpenRouter credit before a big demo to raise the limit.
 
-To skip typing the key during a demo, create a git-ignored `config.local.js`:
-
-```js
-window.AXON_CONFIG = { key: "sk-or-v1-...", model: "~google/gemini-flash-latest" };
-```
+**Static hosting (GitHub Pages).** There's no server, so the page runs in offline mode until you click **⚙️ AI settings** and paste a key. That key is stored only in the browser's localStorage.
 
 Voice input needs Chrome or Edge.
 
@@ -39,6 +36,7 @@ Voice input needs Chrome or Edge.
 | `faq.js` | Campus knowledge base: categories, Q&As, keywords and source links |
 | `app.js` | Chat logic, OpenRouter streaming, offline retrieval, voice |
 | `index.html`, `styles.css` | UI |
+| `server.js` | Optional local server: reads `.env` and proxies AI calls |
 
 ## Sources
 

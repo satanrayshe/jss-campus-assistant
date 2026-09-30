@@ -1,0 +1,12 @@
+{
+  "name": "jss-campus-assistant",
+  "version": "1.0.0",
+  "description": "Axon: AI campus FAQ assistant for JSS University Noida",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

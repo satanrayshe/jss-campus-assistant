@@ -2,8 +2,9 @@ const { faqs, categories, name: CAMPUS_NAME } = window.CAMPUS;
 const byId = Object.fromEntries(faqs.map((f) => [f.id, f]));
 const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
-const DEFAULT_MODEL = "~google/gemini-flash-latest";
-const FALLBACK_MODELS = ["openai/gpt-5.6-luna", "~deepseek/deepseek-flash-latest"];
+// Free OpenRouter models. If one is rate-limited, OpenRouter falls through to the next.
+const DEFAULT_MODEL = "google/gemma-4-31b-it:free";
+const FALLBACK_MODELS = ["nvidia/nemotron-3-super-120b-a12b:free", "openrouter/free"];
 const cfg = window.AXON_CONFIG || {};
 
 const $ = (id) => document.getElementById(id);
@@ -17,11 +18,23 @@ let busy = false;
 
 // ---------- settings ----------
 const getKey = () => localStorage.getItem("axon_key") || cfg.key || "";
-const getModel = () => localStorage.getItem("axon_model") || cfg.model || DEFAULT_MODEL;
+const getModel = () => localStorage.getItem("axon_model") || cfg.model || server.model || DEFAULT_MODEL;
+
+// When run via `npm start`, server.js holds the key (from .env) and proxies AI calls.
+const server = { ai: false, model: "" };
+const useServer = () => server.ai && !getKey();
+const aiOn = () => useServer() || Boolean(getKey());
+fetch("/api/health")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => {
+    if (j?.ai) Object.assign(server, j);
+    updateBadge();
+  })
+  .catch(() => {});
 
 function updateBadge() {
   const badge = $("modeBadge");
-  if (getKey()) {
+  if (aiOn()) {
     badge.textContent = `✨ AI mode · ${getModel().replace(/^~/, "").split("/").pop()}`;
     badge.className = "badge ai";
   } else {
@@ -225,12 +238,12 @@ function systemPrompt() {
 Answer ONLY from the campus knowledge base below. It contains the university's official guidelines.
 Rules:
 - Be warm, concise and practical, like a helpful senior. Use short paragraphs and "- " bullet lists. Bold key facts (**like this**). Don't use headings or tables.
-- Reply in the same language the student used (English, Hindi or Hinglish).
+- LANGUAGE: reply in the same language and script the student used. English gets English, Hindi (Devanagari) gets Hindi, and Hinglish (Hindi written in English letters, e.g. "kitne baje hai") gets Hinglish.
 - Never invent numbers, timings, names, phone numbers or rules. If the answer isn't in the knowledge base, say you don't have that detail yet and point the student to the contact details in [contact].
 - Combine several entries when a question spans topics. Keep every fact exactly as written.
 - If an entry is marked "general guidance", phrase it softly and suggest the student confirms it.
 - Off-topic requests (homework, coding and so on): politely steer back to campus questions.
-- The LAST line of every reply must be exactly: SOURCES: id1, id2  (the ids of the entries you used, or SOURCES: none)
+- The LAST line of every reply must list the [ids] of the entries you used, e.g. "SOURCES: hostel-curfew, library-timings", or "SOURCES: none" if you used none.
 
 === CAMPUS KNOWLEDGE BASE ===
 ${kb}`;
@@ -240,19 +253,23 @@ const SOURCES_RE = /\n*\s*SOURCES:\s*(.*)\s*$/i;
 const visible = (t) => t.replace(SOURCES_RE, "").replace(/\n*S(O(U(R(C(E(S)?)?)?)?)?)?$/, "");
 
 async function answerAI(question, el) {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const viaServer = useServer();
+  const res = await fetch(viaServer ? "/api/chat" : "https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": location.origin.startsWith("http") ? location.origin : "https://github.com/satanrayshe",
-      "X-Title": "Axon Campus Assistant",
-    },
+    headers: viaServer
+      ? { "Content-Type": "application/json" }
+      : {
+          Authorization: `Bearer ${getKey()}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": location.origin.startsWith("http") ? location.origin : "https://github.com/satanrayshe",
+          "X-Title": "Axon Campus Assistant",
+        },
     body: JSON.stringify({
-      models: [getModel(), ...FALLBACK_MODELS.filter((m) => m !== getModel())],
+      models: [getModel(), ...FALLBACK_MODELS.filter((m) => m !== getModel())].slice(0, 3),
       stream: true,
       temperature: 0.3,
-      max_tokens: 700,
+      max_tokens: 1500,
+      reasoning: { effort: "low", exclude: true }, // free reasoning models otherwise burn the token budget thinking
       messages: [{ role: "system", content: systemPrompt() }, ...history.slice(-8)],
     }),
   });
@@ -297,7 +314,11 @@ async function answerAI(question, el) {
   if (!text.trim()) throw new Error("empty response");
 
   const m = text.match(SOURCES_RE);
-  const ids = m ? m[1].split(/[,\s]+/).map((s) => s.replace(/[\[\]]/g, "")).filter((id) => byId[id]) : [];
+  let ids = m ? m[1].split(/[,\s]+/).map((s) => s.replace(/[\[\]]/g, "")).filter((id) => byId[id]) : [];
+  // Some free models garble the SOURCES line; fall back to keyword matching unless they said "none".
+  if (!ids.length && !/^\s*none/i.test(m?.[1] || "")) {
+    ids = search(question).filter((r) => r.score >= 2).slice(0, 2).map((r) => r.f.id);
+  }
   const clean = text.replace(SOURCES_RE, "").trim();
   history.push({ role: "assistant", content: clean });
   finishBot(el, clean, ids, `✨ AI · ${model.split("/").pop()} · grounded in the JSS FAQ`);
@@ -316,7 +337,7 @@ async function ask(question) {
   const el = addBot(`<div class="typing"><span></span><span></span><span></span></div>`);
 
   try {
-    if (getKey()) {
+    if (aiOn()) {
       try {
         await answerAI(question, el);
       } catch (err) {
