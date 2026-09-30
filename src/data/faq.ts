@@ -1,20 +1,38 @@
-// JSS University Noida: campus knowledge base.
+// JSS University Noida campus knowledge base.
 // Facts gathered from the official site (jssuninoida.edu.in) in Sep 2026.
 // `official: false` marks general guidance that isn't published on the site.
 
-const SITE = "https://jssuninoida.edu.in";
+export type CategoryId = "academics" | "library" | "hostel" | "facilities" | "clubs" | "wellbeing" | "contact"
 
-window.CAMPUS = {
+export interface Category {
+  id: CategoryId
+  label: string
+  blurb: string
+}
+
+export interface Faq {
+  id: string
+  category: CategoryId
+  question: string
+  keywords: string[]
+  answer: string
+  source: string
+  official: boolean
+}
+
+const SITE = "https://jssuninoida.edu.in"
+
+export const CAMPUS: { name: string; address: string; categories: Category[]; faqs: Faq[] } = {
   name: "JSS University Noida",
   address: "C-20/1, Sector-62, Noida, U.P. 201301",
   categories: [
-    { id: "academics", label: "Academics", icon: "📘" },
-    { id: "library", label: "Library", icon: "📚" },
-    { id: "hostel", label: "Hostel", icon: "🏠" },
-    { id: "facilities", label: "Campus Facilities", icon: "🏫" },
-    { id: "clubs", label: "Clubs & Events", icon: "🎉" },
-    { id: "wellbeing", label: "Safety & Wellbeing", icon: "🛡️" },
-    { id: "contact", label: "Contacts & Portals", icon: "☎️" },
+    { id: "academics", label: "Academics", blurb: "Attendance, exams, regulations" },
+    { id: "library", label: "Library", blurb: "Collection and hours" },
+    { id: "hostel", label: "Hostel", blurb: "Curfew, rules, rooms" },
+    { id: "facilities", label: "Campus", blurb: "Food, sports, ATM, printing" },
+    { id: "clubs", label: "Clubs & fest", blurb: "Societies and Zealicon" },
+    { id: "wellbeing", label: "Safety & support", blurb: "Health, ragging, counselling" },
+    { id: "contact", label: "Contacts & portals", blurb: "Portal, placements, phone" },
   ],
   faqs: [
     {
@@ -238,4 +256,7 @@ window.CAMPUS = {
       official: true,
     },
   ],
-};
+}
+
+export const byId: Record<string, Faq> = Object.fromEntries(CAMPUS.faqs.map((f) => [f.id, f]))
+export const catById = Object.fromEntries(CAMPUS.categories.map((c) => [c.id, c])) as Record<CategoryId, Category>
