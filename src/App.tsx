@@ -31,6 +31,7 @@ import { CAMPUS, byId } from "@/data/faq"
 import { useSemester } from "@/hooks/useSemester"
 import { useSpeaker } from "@/hooks/useSpeech"
 import { DEFAULT_MODEL, probeServer, streamAnswer, type AiConfig, type ChatTurn } from "@/lib/ai"
+import { GAPS_KEY, KB_KEY, setServerMode } from "@/lib/api"
 import { clearSession, firstName, loadSession, saveSession, type Session } from "@/lib/auth"
 import { groupGaps, loadGaps, logGap } from "@/lib/gaps"
 import { EMPTY, fetchKnowledge, knowledgeForAi, matchKnowledge, setKnowledge, type Knowledge } from "@/lib/knowledge"
@@ -73,6 +74,7 @@ export default function App() {
   const [key, setKey] = useState(() => stored("axon_key"))
   const [model, setModel] = useState(() => stored("axon_model"))
   const [server, setServer] = useState<{ ai: boolean; model: string; faculty?: boolean; senior?: boolean } | null>(null)
+  const [probed, setProbed] = useState(false)
   const [gapVersion, setGapVersion] = useState(0)
   const [kbVersion, setKbVersion] = useState(0)
   const [planOpen, setPlanOpen] = useState(false)
@@ -88,17 +90,31 @@ export default function App() {
   const speaker = useSpeaker()
 
   useEffect(() => {
-    probeServer().then(setServer)
+    probeServer().then((s) => {
+      setServerMode(s !== null) // no server: demo mode, the API runs in this browser
+      setServer(s)
+      setProbed(true)
+    })
   }, [])
   useEffect(() => {
+    if (!probed) return
     fetchKnowledge().then((k) => {
       setKnowledge(k)
       setKnowledgeState(k)
     })
-  }, [kbVersion])
+  }, [kbVersion, probed])
+  // Demo mode: another tab (say, the faculty desk) changed the data; refresh live.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === KB_KEY) setKbVersion((v) => v + 1)
+      if (e.key === GAPS_KEY) setGapVersion((v) => v + 1)
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [])
   useEffect(() => {
     if (session?.role !== "faculty") return
-    loadGaps(true).then((g) => setOpenGaps(groupGaps(g).filter((x) => !knowledge.resolved.includes(x.key)).length))
+    loadGaps().then((g) => setOpenGaps(groupGaps(g).filter((x) => !knowledge.resolved.includes(x.key)).length))
   }, [session, gapVersion, knowledge])
   useEffect(() => localStorage.setItem("axon_sample", isSample ? "1" : "0"), [isSample])
   useEffect(() => localStorage.setItem("axon_autospeak", autoSpeak ? "1" : "0"), [autoSpeak])
@@ -118,7 +134,7 @@ export default function App() {
   }, [messages, view])
 
   function recordGap(question: string, missing: string) {
-    logGap({ question, missing }, shared).then(() => setGapVersion((v) => v + 1))
+    logGap({ question, missing }).then(() => setGapVersion((v) => v + 1))
   }
 
   const ask = useCallback(
@@ -318,7 +334,7 @@ export default function App() {
   if (!session) {
     return (
       <TooltipProvider>
-        <Login onSignIn={signIn} facultyAvailable={Boolean(server?.faculty)} seniorAvailable={Boolean(server?.senior)} />
+        <Login onSignIn={signIn} facultyAvailable={server ? Boolean(server.faculty) : true} seniorAvailable={server ? Boolean(server.senior) : true} />
         <Toaster position="top-center" />
       </TooltipProvider>
     )
@@ -445,7 +461,7 @@ export default function App() {
             </div>
           ) : view === "tips" ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <TipsFeed knowledge={knowledge} serverless={!server} onChanged={() => setKbVersion((v) => v + 1)} />
+              <TipsFeed knowledge={knowledge} onChanged={() => setKbVersion((v) => v + 1)} />
             </div>
           ) : view === "semester" ? (
             <div className="min-h-0 flex-1 overflow-y-auto">

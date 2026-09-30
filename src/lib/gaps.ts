@@ -1,3 +1,5 @@
+import { api } from "@/lib/api"
+
 // Knowledge gaps: campus questions the official guidelines couldn't answer.
 // With server.js they're shared in gaps.json (every student on the server feeds one list);
 // on static hosting they live in this browser's localStorage.
@@ -16,41 +18,13 @@ export interface GapGroup {
   questions: string[]
 }
 
-const LS_KEY = "axon_gaps"
-const readLocal = (): Gap[] => {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]")
-  } catch {
-    return []
-  }
+export async function logGap(gap: Omit<Gap, "at">): Promise<void> {
+  await api("POST", "api/gaps", gap).catch(() => {})
 }
 
-export async function logGap(gap: Omit<Gap, "at">, useServer: boolean): Promise<void> {
-  const entry = { ...gap, at: new Date().toISOString() }
-  if (useServer) {
-    try {
-      const r = await fetch("api/gaps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entry) })
-      if (r.ok) return
-    } catch {
-      /* fall through to local */
-    }
-  }
-  localStorage.setItem(LS_KEY, JSON.stringify([...readLocal(), entry].slice(-500)))
+export async function loadGaps(): Promise<Gap[]> {
+  return api<Gap[]>("GET", "api/gaps").catch(() => [])
 }
-
-export async function loadGaps(useServer: boolean): Promise<Gap[]> {
-  if (useServer) {
-    try {
-      const r = await fetch("api/gaps")
-      if (r.ok) return await r.json()
-    } catch {
-      /* fall through to local */
-    }
-  }
-  return readLocal()
-}
-
-export const clearLocalGaps = () => localStorage.removeItem(LS_KEY)
 
 /** Stable key for "the same missing detail", so a faculty answer can close every copy of it. */
 export const gapKey = (s: string) =>

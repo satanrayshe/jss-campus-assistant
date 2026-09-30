@@ -63,7 +63,7 @@ export function TipCard({ tip, onDelete, onChanged }: { tip: SeniorTip; onDelete
 }
 
 /** Students: tips from seniors, most helpful first, filterable by topic. */
-export function TipsFeed({ knowledge, serverless, onChanged }: { knowledge: Knowledge; serverless: boolean; onChanged: () => void }) {
+export function TipsFeed({ knowledge, onChanged }: { knowledge: Knowledge; onChanged: () => void }) {
   const root = useRef<HTMLDivElement>(null)
   useReveal(root, { y: 8 })
   const [topic, setTopic] = useState<CategoryId | "all">("all")
@@ -102,7 +102,7 @@ export function TipsFeed({ knowledge, serverless, onChanged }: { knowledge: Know
           <IconSenior className="size-8 text-muted-foreground/60" />
           <p className="mt-3 text-sm font-medium">No tips yet</p>
           <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
-            {serverless ? "Senior tips live on the campus server. Run Axon with npm start to see them." : "When seniors share advice, it shows up here, and Axon starts mentioning it in answers."}
+            When seniors share advice, it shows up here, and Axon starts mentioning it in answers.
           </p>
         </div>
       ) : (
@@ -174,7 +174,7 @@ export function SeniorDesk({ token, who, knowledge, onChanged }: { token: string
   const [replying, setReplying] = useState<string | null>(null)
 
   useEffect(() => {
-    loadGaps(true).then((g) => setAsks(groupGaps(g).filter((x) => !knowledge.resolved.includes(x.key)).slice(0, 8)))
+    loadGaps().then((g) => setAsks(groupGaps(g).filter((x) => !knowledge.resolved.includes(x.key)).slice(0, 8)))
   }, [knowledge])
 
   const mine = knowledge.tips.filter((t) => t.by === who).sort((a, b) => b.at.localeCompare(a.at))

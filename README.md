@@ -58,7 +58,10 @@ Set `FACULTY_PASSCODE` and `SENIOR_PASSCODE` in `.env` to enable those sign-ins.
 
 For development, run `npm run serve` for the API and `npm run dev` for Vite with hot reload.
 
-**GitHub Pages** builds automatically on every push (`.github/workflows/pages.yml`). There's no server there, so it runs in offline mode until you add a key under the model pill → AI settings. The key is stored only in that browser, and gaps are logged locally.
+**GitHub Pages** builds automatically on every push (`.github/workflows/pages.yml`) and runs in **demo mode**: with no server, Axon's API runs in the browser.
+- Sign-ins, gaps, faculty answers, uploads and senior tips are saved in that browser and shared live between its tabs. Put a student tab and a faculty tab side by side.
+- Demo passcodes: faculty `jss-faculty-2026`, senior `jss-seniors-2026`. They're checked in the browser, so this is demo-grade only; use `server.js` for real deployments.
+- For AI answers, click the status pill, open AI settings and paste an OpenRouter key. The key is stored only in that browser.
 
 Voice input needs Chrome or Edge.
 

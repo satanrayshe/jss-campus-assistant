@@ -1,4 +1,5 @@
 import { CAMPUS, byId, catById, type CategoryId } from "@/data/faq"
+import { api } from "@/lib/api"
 import { tokens } from "@/lib/search"
 
 // Faculty-published knowledge: answers to gaps and uploaded source material.
@@ -53,12 +54,10 @@ export const setKnowledge = (k: Knowledge) => {
 
 export async function fetchKnowledge(): Promise<Knowledge> {
   try {
-    const r = await fetch("api/knowledge")
-    if (r.ok && r.headers.get("content-type")?.includes("json")) return { ...EMPTY, ...(await r.json()) }
+    return { ...EMPTY, ...(await api<Partial<Knowledge>>("GET", "api/knowledge")) }
   } catch {
-    /* static hosting */
+    return EMPTY
   }
-  return EMPTY
 }
 
 // ---------- source ids shown as chips ----------
@@ -144,16 +143,7 @@ export function matchKnowledge(question: string, k: Knowledge = current): { id: 
 }
 
 // ---------- faculty API ----------
-async function call<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, {
-    method,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const j = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : j.error?.message || `Request failed (${r.status})`)
-  return j as T
-}
+const call = <T>(token: string, method: string, path: string, body?: unknown) => api<T>(method, path, body, token)
 
 export const publishAnswer = (token: string, a: { question: string; answer: string; category: CategoryId; gapKey?: string }) =>
   call<FacultyAnswer>(token, "POST", "api/knowledge/answers", a)
@@ -163,10 +153,13 @@ export const postTip = (token: string, t: { text: string; category: CategoryId; 
 export async function markHelpful(id: string): Promise<number | null> {
   const voted = new Set<string>(JSON.parse(localStorage.getItem("axon_helpful") ?? "[]"))
   if (voted.has(id)) return null
-  const r = await fetch(`api/knowledge/tips/${id}/helpful`, { method: "POST" })
-  if (!r.ok) return null
-  localStorage.setItem("axon_helpful", JSON.stringify([...voted, id]))
-  return (await r.json()).helpful
+  try {
+    const { helpful } = await api<{ helpful: number }>("POST", `api/knowledge/tips/${id}/helpful`)
+    localStorage.setItem("axon_helpful", JSON.stringify([...voted, id]))
+    return helpful
+  } catch {
+    return null
+  }
 }
 export const hasVoted = (id: string) => (JSON.parse(localStorage.getItem("axon_helpful") ?? "[]") as string[]).includes(id)
 export const deleteItem = (token: string, kind: "answers" | "docs" | "tips", id: string) => call(token, "DELETE", `api/knowledge/${kind}/${id}`)

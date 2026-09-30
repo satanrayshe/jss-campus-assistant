@@ -1,3 +1,5 @@
+import { api } from "@/lib/api"
+
 // Who is using Axon. Students identify themselves (no password: their data never leaves
 // this browser). Faculty sign in against server.js with FACULTY_PASSCODE and get a signed token.
 
@@ -9,7 +11,7 @@ const KEY = "axon_session"
 
 export function loadSession(): Session | null {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) ?? "null")
+    const s = JSON.parse(sessionStorage.getItem(KEY) ?? "null")
     if ((s?.role === "faculty" || s?.role === "senior") && tokenExpired(s.token)) return null
     return s
   } catch {
@@ -17,8 +19,8 @@ export function loadSession(): Session | null {
   }
 }
 
-export const saveSession = (s: Session) => localStorage.setItem(KEY, JSON.stringify(s))
-export const clearSession = () => localStorage.removeItem(KEY)
+export const saveSession = (s: Session) => sessionStorage.setItem(KEY, JSON.stringify(s)) // per tab: a student tab and a faculty tab can sit side by side
+export const clearSession = () => sessionStorage.removeItem(KEY)
 
 function tokenExpired(token: string) {
   try {
@@ -30,9 +32,7 @@ function tokenExpired(token: string) {
 }
 
 export async function passcodeLogin(role: "faculty" | "senior", name: string, dept: string, passcode: string): Promise<Session> {
-  const r = await fetch("api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, name, dept, passcode }) })
-  const j = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : "Sign-in failed")
+  const j = await api<{ name: string; dept: string; token: string }>("POST", "api/login", { role, name, dept, passcode })
   return { role, name: j.name, dept: j.dept, token: j.token }
 }
 

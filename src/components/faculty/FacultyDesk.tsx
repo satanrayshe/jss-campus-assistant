@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useReveal } from "@/hooks/useReveal"
+import { isServerMode } from "@/lib/api"
 import type { CategoryId } from "@/data/faq"
 import { gapsCsv, groupGaps, loadGaps, type GapGroup } from "@/lib/gaps"
 import { categories, clearGapsApi, deleteItem, publishAnswer, uploadDoc, type Knowledge } from "@/lib/knowledge"
@@ -105,7 +106,7 @@ export function FacultyDesk({ token, who, knowledge, gapVersion, onChanged, onSi
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    loadGaps(true).then((g) => setGroups(groupGaps(g)))
+    loadGaps().then((g) => setGroups(groupGaps(g)))
   }, [gapVersion, refresh])
 
   const resolved = useMemo(() => new Set(knowledge.resolved), [knowledge.resolved])
@@ -158,6 +159,11 @@ export function FacultyDesk({ token, who, knowledge, gapVersion, onChanged, onSi
       <p className="mt-2 text-sm text-muted-foreground">
         Signed in as {who}. Anything you publish here, Axon starts using in its answers straight away.
       </p>
+      {!isServerMode() && (
+        <p className="mt-3 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Demo mode: everything is saved in this browser, and shared live with other tabs of it. Run the campus server to share across devices.
+        </p>
+      )}
 
       <dl className="mt-6 grid grid-cols-3 divide-x divide-border rounded-2xl border border-border bg-card">
         {[
