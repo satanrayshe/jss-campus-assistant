@@ -1,0 +1,4 @@
+config.local.js
+.env
+node_modules/
+.claude/

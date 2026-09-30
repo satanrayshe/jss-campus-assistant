@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Axon · JSS University Noida Campus Assistant</title>
+  <meta name="description" content="An AI campus assistant for new students at JSS University Noida." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">A</div>
+        <div>
+          <div class="brand-name">Axon</div>
+          <div class="brand-sub">JSS University Noida</div>
+        </div>
+      </div>
+
+      <div class="side-label">Browse by topic</div>
+      <nav id="categories" class="categories"></nav>
+
+      <div class="side-foot">
+        <button id="settingsBtn" class="ghost-btn">⚙️ AI settings</button>
+        <button id="clearBtn" class="ghost-btn">🧹 New chat</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>Campus Assistant</h1>
+          <p class="subtitle">Ask anything about classes, hostel, library, clubs or campus life.</p>
+        </div>
+        <span id="modeBadge" class="badge">…</span>
+      </header>
+
+      <section id="chat" class="chat" aria-live="polite">
+        <div id="welcome" class="welcome">
+          <div class="welcome-emoji">🎓</div>
+          <h2>Welcome to JSS Noida!</h2>
+          <p>I'm Axon, your first-week guide. My answers come from the university's official guidelines. You can ask in English, Hindi or Hinglish, type or talk.</p>
+          <div id="starter" class="chips"></div>
+        </div>
+      </section>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <button type="button" id="micBtn" class="icon-btn" title="Speak your question" aria-label="Voice input">🎤</button>
+        <input id="input" type="text" placeholder="e.g. What time is the girls' hostel curfew?" aria-label="Your question" />
+        <button type="submit" id="sendBtn" class="send-btn" aria-label="Send">➤</button>
+      </form>
+    </main>
+  </div>
+
+  <dialog id="settings" class="settings">
+    <form method="dialog">
+      <h3>AI settings</h3>
+      <p class="muted">Axon uses <b>OpenRouter</b> to write answers grounded in the FAQ. Without a key it still works in offline mode, returning the closest matching FAQ answer.</p>
+      <label>OpenRouter API key
+        <input id="keyInput" type="password" placeholder="sk-or-v1-…" />
+      </label>
+      <label>Model
+        <input id="modelInput" type="text" placeholder="~google/gemini-flash-latest" />
+      </label>
+      <p class="muted small">The key is saved only in this browser's localStorage.</p>
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost-btn">Cancel</button>
+        <button id="saveSettings" value="save" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="faq.js"></script>
+  <!-- Optional, git-ignored: window.AXON_CONFIG = { key: "sk-or-...", model: "..." } -->
+  <script src="config.local.js" onerror="void 0"></script>
+  <script src="app.js"></script>
+</body>
+</html>
