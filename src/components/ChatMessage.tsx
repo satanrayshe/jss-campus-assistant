@@ -8,11 +8,14 @@ import IconGuidance from "~icons/solar/lightbulb-linear"
 import IconWarn from "~icons/solar/danger-triangle-linear"
 import IconRadar from "~icons/solar/radar-2-linear"
 import IconCalendar from "~icons/solar/calendar-linear"
+import IconFaculty from "~icons/solar/user-speak-rounded-linear"
+import IconDoc from "~icons/solar/paperclip-linear"
+import IconSenior from "~icons/solar/users-group-rounded-linear"
 import { AxonMark } from "@/components/AxonMark"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { byId, catById } from "@/data/faq"
 import { useReveal } from "@/hooks/useReveal"
+import { sourceInfo, type SourceKind } from "@/lib/knowledge"
 import { Markdown, plainText } from "@/lib/markdown"
 import type { Profile } from "@/lib/plan"
 import { cn } from "@/lib/utils"
@@ -35,6 +38,14 @@ export type Msg =
       gap?: string
       followUps?: string[]
     }
+
+const SOURCE_ICON: Record<SourceKind, typeof IconOfficial> = {
+  official: IconOfficial,
+  guidance: IconGuidance,
+  faculty: IconFaculty,
+  document: IconDoc,
+  senior: IconSenior,
+}
 
 export function UserMessage({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -135,32 +146,37 @@ export function AssistantMessage({ msg, speaking, onSpeak, onAsk, onOpenSemester
                   </li>
                 )}
                 {msg.sources.map((id) => {
-                  const f = byId[id]
-                  const Icon = f.official ? IconOfficial : IconGuidance
+                  const info = sourceInfo(id)
+                  if (!info) return null
+                  const Icon = SOURCE_ICON[info.kind]
+                  const cls = cn(
+                    "inline-flex max-w-[20rem] items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    info.kind === "official" && "border-border bg-card text-foreground/80 hover:border-foreground/25 hover:text-foreground",
+                    info.kind === "guidance" && "border-saffron/30 bg-saffron-wash text-saffron-ink hover:border-saffron/60",
+                    (info.kind === "faculty" || info.kind === "document") && "border-emerald-700/25 bg-emerald-50 text-emerald-900",
+                    info.kind === "senior" && "border-sky-700/25 bg-sky-50 text-sky-900",
+                  )
+                  const body = (
+                    <>
+                      <Icon className="size-3.5 shrink-0" />
+                      <span className="truncate">{info.label}</span>
+                    </>
+                  )
                   return (
                     <li key={id}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <a
-                            href={f.source}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={cn(
-                              "inline-flex max-w-[20rem] items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                              f.official
-                                ? "border-border bg-card text-foreground/80 hover:border-foreground/25 hover:text-foreground"
-                                : "border-saffron/30 bg-saffron-wash text-saffron-ink hover:border-saffron/60",
-                            )}
-                          >
-                            <Icon className="size-3.5 shrink-0" />
-                            <span className="truncate">
-                              {catById[f.category].label}: {f.question}
+                          {info.href ? (
+                            <a href={info.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                              {body}
+                            </a>
+                          ) : (
+                            <span tabIndex={0} className={cls}>
+                              {body}
                             </span>
-                          </a>
+                          )}
                         </TooltipTrigger>
-                        <TooltipContent>
-                          {f.official ? "Official: from jssuninoida.edu.in" : "General guidance, not on the official site. Worth confirming."}
-                        </TooltipContent>
+                        <TooltipContent>{info.tooltip}</TooltipContent>
                       </Tooltip>
                     </li>
                   )

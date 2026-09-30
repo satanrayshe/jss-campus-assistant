@@ -9,6 +9,7 @@ export interface Gap {
 }
 
 export interface GapGroup {
+  key: string
   missing: string
   count: number
   last: string
@@ -49,12 +50,10 @@ export async function loadGaps(useServer: boolean): Promise<Gap[]> {
   return readLocal()
 }
 
-export async function clearGaps(useServer: boolean): Promise<void> {
-  if (useServer) await fetch("api/gaps", { method: "DELETE" }).catch(() => {})
-  localStorage.removeItem(LS_KEY)
-}
+export const clearLocalGaps = () => localStorage.removeItem(LS_KEY)
 
-const norm = (s: string) =>
+/** Stable key for "the same missing detail", so a faculty answer can close every copy of it. */
+export const gapKey = (s: string) =>
   s
     .toLowerCase()
     .replace(/[^a-z0-9ऀ-ॿ\s]/g, "")
@@ -65,14 +64,14 @@ const norm = (s: string) =>
 export function groupGaps(gaps: Gap[]): GapGroup[] {
   const map = new Map<string, GapGroup>()
   for (const g of gaps) {
-    const k = norm(g.missing)
+    const k = gapKey(g.missing)
     const cur = map.get(k)
     if (cur) {
       cur.count++
       if (g.at > cur.last) cur.last = g.at
       if (!cur.questions.includes(g.question)) cur.questions.push(g.question)
     } else {
-      map.set(k, { missing: g.missing, count: 1, last: g.at, questions: [g.question] })
+      map.set(k, { key: k, missing: g.missing, count: 1, last: g.at, questions: [g.question] })
     }
   }
   return [...map.values()].sort((a, b) => b.count - a.count || b.last.localeCompare(a.last))

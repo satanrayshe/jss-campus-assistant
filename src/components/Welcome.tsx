@@ -9,9 +9,9 @@ import { byId, catById } from "@/data/faq"
 import { CATEGORY_ICON } from "@/components/Topics"
 
 const STARTERS = ["attendance", "hostel-curfew", "library-timings", "clubs", "fest", "anti-ragging"]
-const HEADLINE = "Namaste, fresher."
 
 interface Props {
+  name: string
   onAsk: (q: string) => void
   onPlan: () => void
   courses: Course[]
@@ -20,7 +20,8 @@ interface Props {
 
 const PERSONAL = ["What's my next class?", "Can I bunk any class tomorrow?"]
 
-export function Welcome({ onAsk, onPlan, courses, onOpenSemester }: Props) {
+export function Welcome({ name, onAsk, onPlan, courses, onOpenSemester }: Props) {
+  const HEADLINE = `Namaste, ${name || "fresher"}.`
   const next = nextClass(courses)
   const root = useRef<HTMLDivElement>(null)
 
@@ -44,8 +45,8 @@ export function Welcome({ onAsk, onPlan, courses, onOpenSemester }: Props) {
         <span className="sr-only">{HEADLINE}</span>
         <span aria-hidden className="flex flex-wrap gap-x-[0.24em]">
           {HEADLINE.split(" ").map((w, i) => (
-            <span key={w} className="overflow-hidden pb-[0.08em]">
-              <span data-word className={i === 1 ? "inline-block text-saffron italic" : "inline-block"}>
+            <span key={`${w}-${i}`} className="overflow-hidden pb-[0.08em]">
+              <span data-word className={i > 0 ? "inline-block text-saffron italic" : "inline-block"}>
                 {w}
               </span>
             </span>

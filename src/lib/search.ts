@@ -7,7 +7,7 @@ const STOP = new Set(
   ),
 )
 
-const tokens = (s: string) =>
+export const tokens = (s: string) =>
   s
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")

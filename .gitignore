@@ -5,3 +5,4 @@ dist/
 .claude/
 legacy/
 gaps.json
+knowledge.json

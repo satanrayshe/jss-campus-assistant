@@ -1,4 +1,5 @@
-import { CAMPUS, byId, catById } from "@/data/faq"
+import { CAMPUS, catById } from "@/data/faq"
+import { sourceInfo } from "@/lib/knowledge"
 import { search } from "@/lib/search"
 
 // Free OpenRouter models, picked for staying faithful to the FAQ in testing (Sep 2026).
@@ -15,9 +16,11 @@ export interface AiConfig {
   model: string
   /** The student's own timetable and attendance (from My semester), already computed. */
   personal?: string
+  /** Faculty answers and relevant uploaded passages for this question. */
+  knowledge?: string
 }
 
-function systemPrompt(personal = "") {
+function systemPrompt(personal = "", knowledge = "") {
   const kb = CAMPUS.faqs
     .map(
       (f) =>
@@ -41,6 +44,15 @@ Rules:
 
 === CAMPUS KNOWLEDGE BASE ===
 ${kb}${
+    knowledge
+      ? `
+
+=== FROM JSS FACULTY AND SENIORS ===
+Faculty answers and uploaded documents are as authoritative as the entries above, and newer.
+Entries marked "Senior tip" are advice from senior students, NOT official policy: introduce them as "Seniors say…" or "A senior's tip:", keep them separate from official facts, and if one conflicts with an official entry, the official entry wins.
+${knowledge}`
+      : ""
+  }${
     personal
       ? `
 
@@ -93,7 +105,7 @@ export async function streamAnswer(
       temperature: 0.3,
       max_tokens: 1500,
       reasoning: { effort: "low", exclude: true }, // free reasoning models otherwise burn the token budget thinking
-      messages: [{ role: "system", content: systemPrompt(cfg.personal) }, ...history.slice(-8)],
+      messages: [{ role: "system", content: systemPrompt(cfg.personal, cfg.knowledge) }, ...history.slice(-8)],
     }),
   })
   if (!res.ok || !res.body) {
@@ -147,7 +159,7 @@ export async function streamAnswer(
   let sources = srcLine
     .split(/[,\s]+/)
     .map((s) => s.replace(/[[\]]/g, ""))
-    .filter((id) => byId[id])
+    .filter((id) => sourceInfo(id))
   // Some free models garble the SOURCES line; fall back to keyword matching unless they said none/offtopic.
   const question = history.at(-1)?.content ?? ""
   if (!sources.length && !/^(none|offtopic)/i.test(srcLine)) {

@@ -2,14 +2,19 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { toast } from "sonner"
 import IconMenu from "~icons/solar/hamburger-menu-linear"
 import IconRestart from "~icons/solar/restart-linear"
-import IconRadar from "~icons/solar/radar-2-linear"
 import IconChecklist from "~icons/solar/checklist-minimalistic-linear"
 import IconChat from "~icons/solar/chat-round-dots-linear"
 import IconCalendar from "~icons/solar/calendar-linear"
+import IconDesk from "~icons/solar/case-round-linear"
+import IconUser from "~icons/solar/user-circle-linear"
+import IconLogout from "~icons/solar/logout-2-linear"
+import IconSenior from "~icons/solar/users-group-rounded-linear"
 import { AxonMark } from "@/components/AxonMark"
 import { AssistantMessage, UserMessage, type Msg } from "@/components/ChatMessage"
 import { Composer } from "@/components/Composer"
-import { GapsPanel } from "@/components/GapsPanel"
+import { Login } from "@/components/Login"
+import { FacultyDesk } from "@/components/faculty/FacultyDesk"
+import { SeniorDesk, TipsFeed } from "@/components/seniors/Tips"
 import { PlanDialog } from "@/components/PlanDialog"
 import { PlanMessage } from "@/components/PlanMessage"
 import { SettingsDialog } from "@/components/SettingsDialog"
@@ -18,6 +23,7 @@ import { Welcome } from "@/components/Welcome"
 import { ImportDialog } from "@/components/semester/ImportDialog"
 import { SemesterView } from "@/components/semester/SemesterView"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Toaster } from "@/components/ui/sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -25,7 +31,9 @@ import { CAMPUS, byId } from "@/data/faq"
 import { useSemester } from "@/hooks/useSemester"
 import { useSpeaker } from "@/hooks/useSpeech"
 import { DEFAULT_MODEL, probeServer, streamAnswer, type AiConfig, type ChatTurn } from "@/lib/ai"
-import { logGap } from "@/lib/gaps"
+import { clearSession, firstName, loadSession, saveSession, type Session } from "@/lib/auth"
+import { groupGaps, loadGaps, logGap } from "@/lib/gaps"
+import { EMPTY, fetchKnowledge, knowledgeForAi, matchKnowledge, setKnowledge, type Knowledge } from "@/lib/knowledge"
 import { plainText } from "@/lib/markdown"
 import type { Profile } from "@/lib/plan"
 import { matchFaqs } from "@/lib/search"
@@ -33,7 +41,7 @@ import { answerPersonal, classesOn, contextForAi, mark, parseLog, pct, sampleSem
 import { cn } from "@/lib/utils"
 
 type AssistantMsg = Extract<Msg, { role: "assistant" }>
-type View = "chat" | "semester"
+type View = "chat" | "semester" | "faculty" | "senior" | "tips"
 
 const NO_MATCH =
   "I don't have that in my campus guide yet. Try a topic from the list, or contact the university:\n- **Phone:** 0120-2401484\n- **Email:** admissions@jssuninoida.edu.in"
@@ -42,6 +50,7 @@ let seq = 0
 const uid = () => `m${++seq}`
 
 function followUps(sources: string[], asked: Set<string>) {
+  sources = sources.filter((id) => byId[id]) // only campus FAQ entries have related questions
   if (!sources.length) return [] // nothing to relate to; random suggestions would read as noise
   const cats = new Set(sources.map((id) => byId[id]?.category))
   const pool = CAMPUS.faqs.filter((f) => !sources.includes(f.id) && !asked.has(f.question))
@@ -49,9 +58,13 @@ function followUps(sources: string[], asked: Set<string>) {
 }
 
 const stored = (k: string) => localStorage.getItem(k) ?? ""
+const homeView = (s: Session | null): View => (s?.role === "faculty" ? "faculty" : s?.role === "senior" ? "senior" : "chat")
 
 export default function App() {
-  const [view, setView] = useState<View>("chat")
+  const [session, setSession] = useState<Session | null>(loadSession)
+  const [view, setView] = useState<View>(() => homeView(loadSession()))
+  const [knowledge, setKnowledgeState] = useState<Knowledge>(EMPTY)
+  const [openGaps, setOpenGaps] = useState(0)
   const [messages, setMessages] = useState<Msg[]>([])
   const [busy, setBusy] = useState(false)
   const [asked, setAsked] = useState<Set<string>>(() => new Set())
@@ -59,10 +72,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [key, setKey] = useState(() => stored("axon_key"))
   const [model, setModel] = useState(() => stored("axon_model"))
-  const [server, setServer] = useState<{ ai: boolean; model: string } | null>(null)
-  const [gapsOpen, setGapsOpen] = useState(false)
-  const [gapCount, setGapCount] = useState(0)
+  const [server, setServer] = useState<{ ai: boolean; model: string; faculty?: boolean; senior?: boolean } | null>(null)
   const [gapVersion, setGapVersion] = useState(0)
+  const [kbVersion, setKbVersion] = useState(0)
   const [planOpen, setPlanOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [isSample, setIsSample] = useState(() => stored("axon_sample") === "1")
@@ -78,6 +90,16 @@ export default function App() {
   useEffect(() => {
     probeServer().then(setServer)
   }, [])
+  useEffect(() => {
+    fetchKnowledge().then((k) => {
+      setKnowledge(k)
+      setKnowledgeState(k)
+    })
+  }, [kbVersion])
+  useEffect(() => {
+    if (session?.role !== "faculty") return
+    loadGaps(true).then((g) => setOpenGaps(groupGaps(g).filter((x) => !knowledge.resolved.includes(x.key)).length))
+  }, [session, gapVersion, knowledge])
   useEffect(() => localStorage.setItem("axon_sample", isSample ? "1" : "0"), [isSample])
   useEffect(() => localStorage.setItem("axon_autospeak", autoSpeak ? "1" : "0"), [autoSpeak])
 
@@ -127,6 +149,8 @@ export default function App() {
         const personal = answerPersonal(question, semester.courses)
         if (personal) return finish({ text: personal, sources: [], mode: "tracker", personal: true, note })
         const hits = matchFaqs(question)
+        const fac = hits.length ? null : matchKnowledge(question)
+        if (fac) return finish({ text: fac.text, sources: [fac.id], mode: "offline", note })
         const text = hits.length ? hits.map((f) => f.answer).join("\n\n") : NO_MATCH
         const sources = hits.map((f) => f.id)
         const gap = hits.length ? undefined : "not covered by any FAQ entry"
@@ -154,7 +178,7 @@ export default function App() {
         abort.current = new AbortController()
         try {
           const res = await streamAnswer(
-            { ...aiConfig, personal: contextForAi(semester.courses) },
+            { ...aiConfig, personal: contextForAi(semester.courses), knowledge: knowledgeForAi(question) },
             turns.current,
             (text) => patch(id, { text, status: "streaming" }),
             abort.current.signal,
@@ -180,7 +204,7 @@ export default function App() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy, asked, aiConfig?.key, aiConfig?.model, aiConfig?.viaServer, shared, semester.courses, autoSpeak],
+    [busy, asked, aiConfig?.key, aiConfig?.model, aiConfig?.viaServer, shared, semester.courses, autoSpeak, knowledge],
   )
 
   const buildPlan = (profile: Profile) => {
@@ -207,6 +231,17 @@ export default function App() {
     toast.success(k || server?.ai ? "AI mode on" : "Offline mode", {
       description: k || server?.ai ? "Answers are written by a free model, grounded in the FAQ." : "Answers come straight from the FAQ.",
     })
+  }
+
+  const signIn = (s: Session) => {
+    saveSession(s)
+    setSession(s)
+    setView(homeView(s))
+  }
+  const signOut = () => {
+    clearSession()
+    newChat()
+    setSession(null)
   }
 
   const go = (v: View) => {
@@ -236,27 +271,34 @@ export default function App() {
   const sidebar = (
     <>
       <nav aria-label="Main" className="mb-5 flex flex-col gap-0.5">
-        {navItem("chat", IconChat, "Ask Axon", "Campus questions, any language")}
-        {navItem(
-          "semester",
-          IconCalendar,
-          "My semester",
-          semester.courses.length ? `${todayCount} ${todayCount === 1 ? "class" : "classes"} today · bunk maths` : "Timetable + bunk calculator",
+        {session?.role === "faculty" && navItem("faculty", IconDesk, "Faculty desk", openGaps ? `${openGaps} open ${openGaps === 1 ? "gap" : "gaps"} to answer` : "Gaps, answers, source material")}
+        {session?.role === "senior" && navItem("senior", IconSenior, "Senior desk", "Share tips with freshers")}
+        {navItem("chat", IconChat, "Ask Axon", session?.role !== "student" ? "See what students see" : "Campus questions, any language")}
+        {session?.role === "student" &&
+          navItem("tips", IconSenior, "From seniors", knowledge.tips.length ? `${knowledge.tips.length} ${knowledge.tips.length === 1 ? "tip" : "tips"} from JSS seniors` : "Tips from JSS seniors")}
+        {session?.role === "student" &&
+          navItem(
+            "semester",
+            IconCalendar,
+            "My semester",
+            semester.courses.length ? `${todayCount} ${todayCount === 1 ? "class" : "classes"} today · bunk maths` : "Timetable + bunk calculator",
+          )}
+        {session?.role === "student" && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              setPlanOpen(true)
+            }}
+            className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <IconChecklist className="size-[18px] shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">First-week plan</span>
+              <span className="block text-xs text-muted-foreground">A checklist built for you</span>
+            </span>
+          </button>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            setMenuOpen(false)
-            setPlanOpen(true)
-          }}
-          className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <IconChecklist className="size-[18px] shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">First-week plan</span>
-            <span className="block text-xs text-muted-foreground">A checklist built for you</span>
-          </span>
-        </button>
       </nav>
       <p className="px-2.5 pb-2 text-xs font-medium text-muted-foreground">Browse by topic</p>
       <Topics onAsk={ask} asked={asked} />
@@ -272,6 +314,15 @@ export default function App() {
       </div>
     </>
   )
+
+  if (!session) {
+    return (
+      <TooltipProvider>
+        <Login onSignIn={signIn} facultyAvailable={Boolean(server?.faculty)} seniorAvailable={Boolean(server?.senior)} />
+        <Toaster position="top-center" />
+      </TooltipProvider>
+    )
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -309,7 +360,7 @@ export default function App() {
 
             {/* Mobile view switch */}
             <div className="flex rounded-full border border-border bg-card p-0.5 md:hidden" role="tablist" aria-label="View">
-              {(["chat", "semester"] as View[]).map((v) => (
+              {(session?.role === "faculty" ? (["faculty", "chat"] as View[]) : session?.role === "senior" ? (["senior", "chat"] as View[]) : (["chat", "semester", "tips"] as View[])).map((v) => (
                 <button
                   key={v}
                   role="tab"
@@ -317,26 +368,12 @@ export default function App() {
                   onClick={() => go(v)}
                   className={cn("rounded-full px-3 py-1 text-xs font-medium transition-colors", view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
                 >
-                  {v === "chat" ? "Ask" : "Semester"}
+                  {({ chat: "Ask", semester: "Semester", tips: "Seniors", faculty: "Desk", senior: "Desk" } as const)[v]}
                 </button>
               ))}
             </div>
 
             <div className="ml-auto flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setGapsOpen(true)} aria-label="Knowledge gaps">
-                    <IconRadar className="size-[18px]" />
-                    <span className="hidden sm:inline">Gaps</span>
-                    {gapCount > 0 && (
-                      <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-saffron px-1 font-mono text-[10px] font-medium text-white tabular-nums">
-                        {gapCount}
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Knowledge gaps: what the guidelines don't answer yet</TooltipContent>
-              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2 rounded-full pr-3 pl-2.5" onClick={() => setSettingsOpen(true)}>
@@ -351,6 +388,30 @@ export default function App() {
                 </TooltipTrigger>
                 <TooltipContent>{aiOn ? "AI answers are on. Change the model or key." : "Add an OpenRouter key for AI answers"}</TooltipContent>
               </Tooltip>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" aria-label="Account">
+                    <IconUser className="size-[18px]" />
+                    <span className="hidden max-w-28 truncate lg:inline">{session && session.name ? firstName(session) : "Guest"}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <p className="text-sm font-medium">{session?.name || "Guest student"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {session?.role === "student"
+                        ? session.roll
+                          ? `Student · ${session.roll}`
+                          : "Student"
+                        : `${session?.role === "faculty" ? "Faculty" : "Senior"}${session?.dept ? ` · ${session.dept}` : ""}`}
+                    </p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={signOut}>
+                    <IconLogout /> Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {view === "chat" && messages.length > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -364,7 +425,29 @@ export default function App() {
             </div>
           </header>
 
-          {view === "semester" ? (
+          {view === "faculty" && session?.role === "faculty" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <FacultyDesk
+                token={session.token}
+                who={session.dept ? `${session.name}, ${session.dept}` : session.name}
+                knowledge={knowledge}
+                gapVersion={gapVersion}
+                onChanged={() => {
+                  setKbVersion((v) => v + 1)
+                  setGapVersion((v) => v + 1)
+                }}
+                onSignedOut={signOut}
+              />
+            </div>
+          ) : view === "senior" && session?.role === "senior" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <SeniorDesk token={session.token} who={session.dept ? `${session.name}, ${session.dept}` : session.name} knowledge={knowledge} onChanged={() => setKbVersion((v) => v + 1)} />
+            </div>
+          ) : view === "tips" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <TipsFeed knowledge={knowledge} serverless={!server} onChanged={() => setKbVersion((v) => v + 1)} />
+            </div>
+          ) : view === "semester" ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
               <SemesterView
                 semester={semester}
@@ -392,7 +475,13 @@ export default function App() {
                 className="min-h-0 flex-1 overflow-y-auto"
               >
                 {messages.length === 0 ? (
-                  <Welcome onAsk={ask} onPlan={() => setPlanOpen(true)} courses={semester.courses} onOpenSemester={() => go("semester")} />
+                  <Welcome
+                    name={session?.role === "student" && session.name ? firstName(session) : ""}
+                    onAsk={ask}
+                    onPlan={() => setPlanOpen(true)}
+                    courses={semester.courses}
+                    onOpenSemester={() => go("semester")}
+                  />
                 ) : (
                   <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-5 pt-8 pb-10" aria-live="polite">
                     {messages.map((m) =>
@@ -421,7 +510,6 @@ export default function App() {
       </div>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} serverHasKey={Boolean(server?.ai)} keyValue={key} modelValue={model} onSave={saveSettings} />
-      <GapsPanel open={gapsOpen} onOpenChange={setGapsOpen} shared={shared} version={gapVersion} onCount={setGapCount} />
       <PlanDialog open={planOpen} onOpenChange={setPlanOpen} onBuild={buildPlan} />
       <ImportDialog
         open={importOpen}

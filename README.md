@@ -13,9 +13,19 @@ An AI assistant for new students at **JSS University Noida**. It answers first-w
 - Log attendance by typing. "attended PPS, skipped maths" or "aaj maths chhodi aur physics attend kiya" updates the tracker instantly, even offline.
 - **Hands-free mode** reads every answer aloud. Tap the mic, speak (it waits through pauses), tap again, and listen to the reply.
 
-**2. Knowledge-gap radar.** Most campus bots either guess or give up quietly when they don't know something. Axon tells the student the guidelines don't cover it, then **logs the gap**. The **Gaps** panel groups these by topic and counts them ("college bus from the metro, asked 14×"). One click exports a CSV, or copies an email draft for the admin office. So every unanswered question becomes a to-do item for whoever maintains the guidelines.
+**2. Three roles, one loop: students ask, seniors share, faculty answer.**
+- **Students** sign in with their name (no password; their data stays on their device).
+- **Seniors and alumni** sign in with a senior passcode. They post tips for freshers ("what I wish I'd known") and reply to what freshers are asking. Freshers browse them in **From seniors** and mark tips helpful. Axon quotes tips as *"Seniors say…"*, clearly labelled, and never as official policy.
+- **Faculty** sign in with a faculty passcode to the **Faculty desk**:
+  - answer knowledge gaps, which closes them
+  - upload source material (PDF, TXT or MD circulars, or pasted text) that Axon searches for every question
+  - moderate senior tips
 
-**3. My first-week plan.** Three taps (hostel or day scholar, programme, interests) build a personal checklist from the knowledge base:
+  The next student who asks gets the faculty answer, with an "Answered by Dr. …" or "📎 circular" badge.
+
+**3. Knowledge-gap radar.** Most campus bots either guess or give up quietly when they don't know something. Axon tells the student the guidelines don't cover it, then **logs the gap**. The **Gaps** panel groups these by topic and counts them ("college bus from the metro, asked 14×"). One click exports a CSV, or copies an email draft for the admin office. So every unanswered question becomes a to-do item for whoever maintains the guidelines.
+
+**4. My first-week plan.** Three taps (hostel or day scholar, programme, interests) build a personal checklist from the knowledge base:
 - your exact curfew
 - the 75% attendance rule
 - the anti-ragging helpline
@@ -23,7 +33,7 @@ An AI assistant for new students at **JSS University Noida**. It answers first-w
 
 Every item cites its source. You can tick items off (progress is saved) and print the plan.
 
-**4. Grounded answers with sources.** Each answer shows the entries it drew on. 📄 marks an official fact, 💡 marks general guidance worth confirming. The model is instructed not to add tips or details that aren't in the knowledge base.
+**5. Grounded answers with sources.** Each answer shows the entries it drew on. 📄 marks an official fact, 💡 marks general guidance worth confirming. The model is instructed not to add tips or details that aren't in the knowledge base.
 
 ## Features
 
@@ -41,6 +51,8 @@ npm install
 cp .env.example .env      # paste your OpenRouter key into .env
 npm start                 # builds, then serves http://localhost:3000
 ```
+
+Set `FACULTY_PASSCODE` and `SENIOR_PASSCODE` in `.env` to enable those sign-ins. Faculty answers, uploaded documents and senior tips are stored in `knowledge.json`.
 
 `server.js` has no dependencies. It serves the build, keeps the API key on the server (`/api/chat` proxy) and stores knowledge gaps in `gaps.json`, so everyone using that server feeds one shared list. If port 3000 is busy it moves to the next free port.
 
